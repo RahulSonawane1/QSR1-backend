@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Details</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f8f8f8; margin: 0; padding: 0; }
+    .container { max-width: 480px; margin: 32px auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 12px #0001; padding: 24px; }
+    h1 { color: #FC8019; font-size: 2rem; margin-bottom: 8px; }
+    .section { margin-bottom: 24px; }
+    .label { color: #888; font-size: 14px; }
+    .value { font-size: 16px; font-weight: bold; }
+    .items-list { margin: 0; padding: 0; list-style: none; }
+    .item { border-bottom: 1px solid #eee; padding: 8px 0; }
+    .item:last-child { border-bottom: none; }
+    .summary { margin-top: 16px; }
+    .summary-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .total { color: #FC8019; font-size: 18px; font-weight: bold; }
+    .status { padding: 4px 12px; border-radius: 20px; font-size: 13px; display: inline-block; margin-top: 8px; }
+    .status-pending { background: #fff3e0; color: #FF9800; }
+    .status-preparing { background: #e8f5e9; color: #8BC34A; }
+    .status-ready { background: #e3f2fd; color: #03A9F4; }
+    .status-delivered { background: #e8f5e9; color: #4CAF50; }
+    .qr { text-align: center; margin: 24px 0; }
+    .not-found { color: #FC8019; font-weight: bold; text-align: center; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <div class="container" id="orderContainer">
+    <h1>Order Details</h1>
+    <div id="loading">Loading...</div>
+    <div id="orderDetails" style="display:none;"></div>
+    <div id="notFound" class="not-found" style="display:none;">Order not found.</div>
+  </div>
+  <script>
+    function getStatusClass(status) {
+      switch (status) {
+        case 'Pending': return 'status status-pending';
+        case 'Preparing': return 'status status-preparing';
+        case 'Ready': return 'status status-ready';
+        case 'Delivered': return 'status status-delivered';
+        default: return 'status';
+      }
+    }
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      const d = new Date(dateString);
+      return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    }
+    async function fetchOrder() {
+      const params = new URLSearchParams(window.location.search);
+      const orderId = params.get('orderId');
+      if (!orderId) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('notFound').style.display = 'block';
+        return;
+      }
+      try {
+        const res = await fetch(`/api/orders/public/${orderId}`);
+        const data = await res.json();
+        document.getElementById('loading').style.display = 'none';
+        if (!data.success || !data.order) {
+          document.getElementById('notFound').style.display = 'block';
+          return;
+        }
+        const o = data.order;
+        let html = '';
+        html += `<div class='section'><span class='label'>Order ID:</span> <span class='value'>${o.orderId}</span></div>`;
+        html += `<div class='section'><span class='label'>Cafeteria:</span> <span class='value'>${o.cafeteriaName || o.cafeteriaId}</span></div>`;
+        html += `<div class='section'><span class='label'>Branch:</span> <span class='value'>${o.branchName || o.branchId}</span></div>`;
+        html += `<div class='section'><span class='label'>Order Time:</span> <span class='value'>${formatDate(o.orderTime)}</span></div>`;
+        html += `<div class='section'><span class='label'>Status:</span> <span class='${getStatusClass(o.orderStatus)}'>${o.orderStatus}</span></div>`;
+        html += `<div class='section'><span class='label'>Ordered Items:</span><ul class='items-list'>`;
+        if (o.cart && o.cart.length > 0) {
+          o.cart.forEach(item => {
+            html += `<li class='item'><b>${item.name}</b> × ${item.quantity} <span style='float:right;'>₹${Number(item.price).toFixed(2)}</span></li>`;
+          });
+        } else {
+          html += `<li class='item'>No items</li>`;
+        }
+        html += `</ul></div>`;
+        html += `<div class='summary'>`;
+        html += `<div class='summary-row'><span>Subtotal:</span><span>₹${o.itemAmount.toFixed(2)}</span></div>`;
+        html += `<div class='summary-row'><span>CGST (18%):</span><span>₹${o.cgstAmount.toFixed(2)}</span></div>`;
+        html += `<div class='summary-row'><span>SGST (12%):</span><span>₹${o.sgstAmount.toFixed(2)}</span></div>`;
+        html += `<div class='summary-row total'><span>Total:</span><span>₹${o.total.toFixed(2)}</span></div>`;
+        html += `</div>`;
+        document.getElementById('orderDetails').innerHTML = html;
+        document.getElementById('orderDetails').style.display = 'block';
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('notFound').style.display = 'block';
+      }
+    }
+    fetchOrder();
+  </script>
+</body>
+</html>
